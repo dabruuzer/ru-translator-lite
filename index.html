@@ -90,7 +90,8 @@
                 <div class="flex items-center justify-between">
                     <span class="text-sm font-medium">Tone / Style:</span>
                     <select id="toneSelect" onchange="savePreferences()" class="bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-48 dark:text-white transition-colors">
-                        <option value="Casual & Modern (Use natural slang)">Casual & Modern</option>
+                        <!-- Updated to be 'Casual & Natural' -->
+                        <option value="Casual & Natural (Everyday adult conversation)">Casual & Natural</option>
                         <option value="Standard / Neutral">Standard</option>
                         <option value="Professional & Formal">Professional</option>
                         <option value="Strictly Literal">Literal</option>
@@ -227,7 +228,7 @@
         let isRecording = false;
         let recognition = null;
 
-        // --- STREAMING_CHUNK:Setting up initialization and UI manipulation functions... ---
+        // --- Setting up initialization and UI manipulation functions... ---
         document.addEventListener('DOMContentLoaded', () => {
             populateLanguageSelects();
             initSpeechRecognition();
@@ -257,7 +258,6 @@
             }
         }
 
-        // --- STREAMING_CHUNK: Adding Copy to Clipboard logic... ---
         function copyOutput() {
             const outBox = document.getElementById('outputText');
             if (!outBox.value) return;
@@ -319,7 +319,6 @@
             savePreferences();
         }
 
-        // --- STREAMING_CHUNK:Implementing local storage state preservation... ---
         function savePreferences() {
             const prefs = {
                 source: document.getElementById('sourceLang').value,
@@ -338,7 +337,14 @@
                     const prefs = JSON.parse(saved);
                     document.getElementById('sourceLang').value = prefs.source || 'en';
                     document.getElementById('targetLang').value = prefs.target || 'ru';
-                    document.getElementById('toneSelect').value = prefs.tone || 'Casual & Modern (Use natural slang)';
+                    
+                    // Fallback to new wording if old 'Modern' selection was cached
+                    if (prefs.tone && prefs.tone.includes("Modern")) {
+                        document.getElementById('toneSelect').value = 'Casual & Natural (Everyday adult conversation)';
+                    } else {
+                        document.getElementById('toneSelect').value = prefs.tone || 'Casual & Natural (Everyday adult conversation)';
+                    }
+                    
                     document.getElementById('profanityCheck').checked = !!prefs.profanity;
                     setGender(prefs.gender || 'male');
                 } catch (e) {
@@ -351,7 +357,6 @@
             }
         }
 
-        // --- STREAMING_CHUNK:Adding Web Speech API logic... ---
         function initSpeechRecognition() {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (SpeechRecognition) {
@@ -401,7 +406,6 @@
             document.getElementById('micBtn').classList.remove('mic-listening');
         }
 
-        // --- STREAMING_CHUNK:Handling Modals and API logic... ---
         function openInfoModal(type) {
             const content = MODAL_CONTENT[type];
             if (content) {
@@ -457,7 +461,6 @@
             closeModal('apiKeyModal');
         }
 
-        // --- STREAMING_CHUNK:Executing the AI translation fetch... ---
         async function translateText() {
             const textToTranslate = document.getElementById('inputText').value.trim();
             if (!textToTranslate) return;
@@ -484,15 +487,18 @@
             
             const tone = document.getElementById('toneSelect').value;
             const keepProfanity = document.getElementById('profanityCheck').checked;
+            
+            // Updated Profanity Guardrails
             const profanityInstruction = keepProfanity 
-                ? "PRESERVE all profanity, swear words, and slang exactly as intended in the target language. Do not censor." 
+                ? "PRESERVE all profanity, sexual explicitness, and raw emotional intensity exactly as intended in the target language. Use natural, mature adult vocabulary. Do not soften, romanticize, or censor explicit words, and do NOT insert juvenile internet slang." 
                 : "FILTER out profanity and highly offensive language appropriately.";
 
+            // Updated Tone Guardrails
             const prompt = `You are a professional, context-aware translator.
 Task: Translate the following text from ${sourceName} to ${targetName}.
 Context & Rules:
 1. The speaker is ${currentGender}. Ensure perfect grammatical gender agreement for verbs and adjectives referring to the speaker.
-2. Tone & Style: ${tone}. Adapt idioms and phrasing to match this style perfectly.
+2. Tone & Style: ${tone}. Translate into the natural, everyday spoken language of a mature adult. DO NOT use juvenile internet slang, Gen-Z buzzwords, or try-hard meme vocabulary (e.g., avoid terms like 'cringe', 'vibe', 'bro' in their respective target languages).
 3. ${profanityInstruction}
 4. ONLY return the translated text. Do not provide any conversational filler, explanations, or quotes around the output.
 
@@ -500,12 +506,18 @@ Text to translate:
 ${textToTranslate}`;
 
             try {
-                // Using Flash-Lite for speed
+                // Using Flash-Lite for speed with BLOCK_NONE safety overrides
                 const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        contents: [{ parts: [{ text: prompt }] }]
+                        contents: [{ parts: [{ text: prompt }] }],
+                        safetySettings: [
+                            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+                            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+                            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+                            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+                        ]
                     })
                 });
 
